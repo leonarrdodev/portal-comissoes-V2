@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
     <h1 class="h2">Dashboard do Administrador</h1>
 </div>
+
 <div class="row">
     <div class="col-md-6 col-xl-3 mb-4">
         <div class="card text-bg-primary h-100">
@@ -45,6 +47,7 @@
         </div>
     </div>
 </div>
+
 <div class="row">
     <div class="col-xl-8 mb-4">
         <div class="card">
@@ -65,28 +68,53 @@
     </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const weeklyCtx = document.getElementById('weeklyChart');
     new Chart(weeklyCtx, {
+        // O tipo principal ainda é 'bar', mas vamos sobrescrever no dataset da linha
         type: 'bar',
         data: {
             labels: {{ chart_labels | tojson }},
-            datasets: [{
-                label: 'Atendimentos por Dia',
-                data: {{ chart_values | tojson }},
-                backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
+            // AQUI ESTÁ A MUDANÇA: 'datasets' agora é uma lista com DOIS objetos
+            datasets: [
+                {
+                    // Objeto 1: As Barras (como já tínhamos)
+                    label: 'Atendimentos por Dia',
+                    data: {{ chart_values | tojson }},
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    order: 2 // Garante que as barras fiquem por baixo
+                },
+                {
+                    // Objeto 2: A Nova Linha de Tendência
+                    type: 'line', // Define este dataset específico como uma linha
+                    label: 'Tendência',
+                    data: {{ chart_values | tojson }}, // Usa os mesmos dados das barras
+                    borderColor: 'rgba(255, 99, 132, 0.8)', // Uma cor diferente (vermelho)
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                    tension: 0.4, // Deixa a linha com curvas suaves
+                    fill: false,
+                    order: 1 // Garante que a linha fique por cima das barras
+                }
+            ]
         },
         options: {
             scales: {
                 y: { beginAtZero: true, ticks: { color: '#ccc' }},
                 x: { ticks: { color: '#ccc' }}
             },
-            plugins: { legend: { display: false }}
+            plugins: { 
+                legend: { 
+                    display: true, // Mostra a legenda (Barras / Tendência)
+                    labels: {
+                        color: '#ccc'
+                    }
+                } 
+            }
         }
     });
 </script>

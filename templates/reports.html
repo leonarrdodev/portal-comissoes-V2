@@ -2,7 +2,10 @@
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fa-solid fa-chart-line me-2"></i>Relatórios Gerais de Comissão</h1>
+    <div>
+        <h1 class="h2"><i class="fa-solid fa-chart-line me-2"></i>Relatórios Gerais de Comissão</h1>
+        <h6 class="text-muted">{{ period_string }}</h6>
+    </div>
 </div>
 
 <div class="card mb-4">
@@ -39,7 +42,13 @@
                     <label for="end_date" class="form-label">Data Fim</label>
                     <input type="date" name="end_date" id="end_date" class="form-control" value="{{ filters.end_date or '' }}">
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-3">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="current_period_switch" name="current_period" value="true" {% if filters.current_period %}checked{% endif %}>
+                        <label class="form-check-label" for="current_period_switch">Usar Período de Cálculo Atual</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         <button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass me-2"></i>Filtrar</button>
                         <a href="{{ url_for('reports') }}" class="btn btn-secondary"><i class="fa-solid fa-eraser me-2"></i>Limpar</a>
@@ -79,12 +88,29 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const periodSwitch = document.getElementById('current_period_switch');
+        const startDateInput = document.getElementById('start_date');
+        const endDateInput = document.getElementById('end_date');
+        function toggleDateInputs() {
+            const isDisabled = periodSwitch.checked;
+            startDateInput.disabled = isDisabled;
+            endDateInput.disabled = isDisabled;
+            if (isDisabled) {
+                startDateInput.value = '';
+                endDateInput.value = '';
+            }
+        }
+        periodSwitch.addEventListener('change', toggleDateInputs);
+        toggleDateInputs();
+    });
+
     const operatorData = {{ attendances_by_operator | tojson }};
     const operatorCtx = document.getElementById('operatorChart');
     if (Object.keys(operatorData).length > 0) {
         new Chart(operatorCtx, {
             type: 'doughnut',
-            data: { labels: Object.keys(operatorData), datasets: [{ data: Object.values(operatorData) }] },
+            data: { labels: Object.keys(operatorData), datasets: [{ data: Object.values(operatorData), backgroundColor: ['rgba(54, 162, 235, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(255, 99, 132, 0.7)', 'rgba(255, 206, 86, 0.7)'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#ccc' } } } }
         });
     }

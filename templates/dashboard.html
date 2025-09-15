@@ -2,39 +2,40 @@
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fa-solid fa-tachometer-alt fa-fw me-2"></i>Dashboard do Atendente</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <span class="btn btn-sm btn-outline-secondary">Olá, {{ current_user.name }}</span>
+    <div>
+        <h1 class="h2"><i class="fa-solid fa-tachometer-alt fa-fw me-2"></i>Meu Dashboard</h1>
+        <h6 class="text-muted">Período de Cálculo: {{ period_string }}</h6>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card text-bg-success h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fa-solid fa-dollar-sign me-2"></i>Sua Comissão no Período</h5>
+                <p class="card-text fs-2 fw-bold">R$ {{ "%.2f"|format(stats.total_commission) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card text-bg-primary h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fa-solid fa-headset me-2"></i>Seus Atendimentos no Período</h5>
+                <p class="card-text fs-2 fw-bold">{{ stats.total_attendances }}</p>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="row">
-    <div class="col-lg-4 mb-4">
-        <div class="card text-bg-success h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fa-solid fa-dollar-sign me-2"></i>Sua Comissão (Mês Atual)</h5>
-                <p class="card-text fs-2 fw-bold">R$ {{ "%.2f"|format(stats.total_commission) }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4 mb-4">
-        <div class="card text-bg-primary h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fa-solid fa-headset me-2"></i>Seus Atendimentos (Mês Atual)</h5>
-                <p class="card-text fs-2 fw-bold">{{ stats.total_attendances }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4 mb-4">
-        <div class="card h-100">
-            <div class="card-header"><i class="fa-solid fa-pie-chart me-2"></i>Suas Atividades (Mês Atual)</div>
-            <div class="card-body d-flex align-items-center justify-content-center">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header"><i class="fa-solid fa-pie-chart me-2"></i>Suas Atividades no Período</div>
+            <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 250px; max-height: 300px;">
                 {% if chart_labels %}
                     <canvas id="subprocessChart"></canvas>
                 {% else %}
-                    <p class="text-muted">Nenhuma atividade registrada este mês para gerar o gráfico.</p>
+                    <p class="text-muted">Nenhuma atividade registrada neste período para gerar o gráfico.</p>
                 {% endif %}
             </div>
         </div>
@@ -43,7 +44,7 @@
 
 <div class="card">
     <div class="card-header">
-        <h2 class="h4 mb-0"><i class="fa-solid fa-list-check me-2"></i>Detalhes das Suas Comissões (Mês Atual)</h2>
+        <h2 class="h4 mb-0"><i class="fa-solid fa-list-check me-2"></i>Detalhes das Suas Comissões no Período</h2>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -57,7 +58,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for commission in commissions %}
+                    {% for commission in pagination.items %}
                     <tr>
                         <td>{{ commission.date.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td>{{ commission.client }}</td>
@@ -66,12 +67,35 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="text-center">Nenhuma comissão encontrada para o mês atual.</td>
+                        <td colspan="4" class="text-center">Nenhuma comissão encontrada para este período.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+    </div>
+    <div class="card-footer d-flex justify-content-center">
+       {% if pagination.pages > 1 %}
+        <nav aria-label="Paginação">
+            <ul class="pagination mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('dashboard', page=pagination.prev_num) }}">Anterior</a>
+                </li>
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        <li class="page-item {% if pagination.page == page_num %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('dashboard', page=page_num) }}">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('dashboard', page=pagination.next_num) }}">Próxima</a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -88,14 +112,7 @@
             datasets: [{
                 label: 'Quantidade',
                 data: {{ chart_values | tojson }},
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.7)',
-                    'rgba(54, 162, 235, 0.7)',
-                    'rgba(255, 206, 86, 0.7)',
-                    'rgba(75, 192, 192, 0.7)',
-                    'rgba(153, 102, 255, 0.7)',
-                    'rgba(255, 159, 64, 0.7)'
-                ],
+                backgroundColor: ['rgba(255, 99, 132, 0.7)','rgba(54, 162, 235, 0.7)','rgba(255, 206, 86, 0.7)','rgba(75, 192, 192, 0.7)','rgba(153, 102, 255, 0.7)','rgba(255, 159, 64, 0.7)'],
                 borderColor: '#444',
                 borderWidth: 1
             }]
@@ -103,12 +120,7 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: { color: '#ccc' }
-                }
-            }
+            plugins: { legend: { position: 'right', labels: { color: '#ccc' } } }
         }
     });
     {% endif %}

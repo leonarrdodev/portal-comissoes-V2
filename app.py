@@ -40,7 +40,7 @@ class User(Document, UserMixin):
     def get_id(self): return str(self.id)
 
 class Commission(Document):
-    user = ReferenceField(User, required=True, reverse_delete_rule=4) # CASCADE on delete
+    user = ReferenceField(User, required=True, reverse_delete_rule=4)
     date = DateTimeField(required=True)
     client = StringField(required=True)
     subprocess = StringField(required=True)
@@ -86,17 +86,28 @@ def logout():
 def dashboard():
     if current_user.role != 'agent': return redirect(url_for('admin_dashboard'))
     today = datetime.utcnow()
-    start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    next_month = start_of_month.replace(day=28) + timedelta(days=4)
-    end_of_month = next_month - timedelta(days=next_month.day)
-    end_of_month = end_of_month.replace(hour=23, minute=59, second=59)
-    commissions_this_month = Commission.objects(user=current_user.id, date__gte=start_of_month, date__lte=end_of_month).order_by('-date')
-    stats = {'total_commission': sum(c.value for c in commissions_this_month), 'total_attendances': len(commissions_this_month)}
+    end_date = today.replace(day=19, hour=23, minute=59, second=59)
+    first_day_of_current_month = today.replace(day=1)
+    last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
+    start_date = last_day_of_previous_month.replace(day=20, hour=0, minute=0, second=0)
+    if today.day >= 20:
+        start_date = today.replace(day=20, hour=0, minute=0, second=0)
+        next_month_start = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
+        end_date = next_month_start.replace(day=19, hour=23, minute=59, second=59)
+    period_string = f"{start_date.strftime('%d/%m/%Y')} a {end_date.strftime('%d/%m/%Y')}"
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
+    commissions_in_period = Commission.objects(user=current_user.id, date__gte=start_date, date__lte=end_date)
+    total = commissions_in_period.count()
+    items = commissions_in_period.order_by('-date').skip((page - 1) * per_page).limit(per_page)
+    pagination = SimpleNamespace(items=items, page=page, per_page=per_page, total=total, pages=int(ceil(total / per_page)), has_prev=(page > 1), has_next=(page * per_page < total), prev_num=page - 1, next_num=page + 1, iter_pages=lambda left_edge=1, right_edge=1, left_current=2, right_current=2: range(1, int(ceil(total / per_page)) + 1))
+    all_commissions_in_period = list(commissions_in_period)
+    stats = {'total_commission': sum(c.value for c in all_commissions_in_period), 'total_attendances': len(all_commissions_in_period)}
     subprocess_counts = defaultdict(int)
-    for c in commissions_this_month: subprocess_counts[c.subprocess] += 1
+    for c in all_commissions_in_period: subprocess_counts[c.subprocess] += 1
     chart_labels = list(subprocess_counts.keys())
     chart_values = list(subprocess_counts.values())
-    return render_template('dashboard.html', commissions=commissions_this_month, stats=stats, chart_labels=chart_labels, chart_values=chart_values)
+    return render_template('dashboard.html', pagination=pagination, stats=stats, chart_labels=chart_labels, chart_values=chart_values, period_string=period_string)
 
 @app.route('/admin')
 @login_required
@@ -184,36 +195,38 @@ def reports():
     subprocess_filter = request.args.get('subprocess')
     start_date_filter = request.args.get('start_date')
     end_date_filter = request.args.get('end_date')
+    current_period_filter = request.args.get('current_period')
+    period_string = "Exibindo todos os períodos"
+    if current_period_filter:
+        today = datetime.utcnow()
+        end_date = today.replace(day=19, hour=23, minute=59, second=59)
+        start_date = (today.replace(day=1) - timedelta(days=1)).replace(day=20, hour=0, minute=0, second=0)
+        if today.day >= 20:
+            start_date = today.replace(day=20, hour=0, minute=0, second=0)
+            end_date = (start_date.replace(day=28) + timedelta(days=4)).replace(day=19, hour=23, minute=59, second=59)
+        start_date_filter = start_date.strftime('%Y-%m-%d')
+        end_date_filter = end_date.strftime('%Y-%m-%d')
+        period_string = f"Período de Cálculo Atual ({start_date.strftime('%d/%m')} a {end_date.strftime('%d/%m')})"
+    elif start_date_filter or end_date_filter:
+        start_str = datetime.strptime(start_date_filter, '%Y-%m-%d').strftime('%d/%m/%Y') if start_date_filter else "início"
+        end_str = datetime.strptime(end_date_filter, '%Y-%m-%d').strftime('%d/%m/%Y') if end_date_filter else "fim"
+        period_string = f"Período de {start_str} a {end_str}"
     query_filters = {}
     if user_filter: query_filters['user'] = user_filter
     if sector_filter: query_filters['sector'] = sector_filter
     if subprocess_filter: query_filters['subprocess'] = subprocess_filter
     if start_date_filter: query_filters['date__gte'] = start_date_filter
     if end_date_filter: query_filters['date__lte'] = end_date_filter
-    
     filtered_commissions = Commission.objects(**query_filters).order_by('-date').select_related()
-    
     attendances_by_operator = defaultdict(int)
     attendances_by_subprocess = defaultdict(int)
     for c in filtered_commissions:
         attendances_by_operator[c.user.name] += 1
         attendances_by_subprocess[c.subprocess] += 1
-    
     operators = User.objects(role__in=['agent', 'admin', 'superadmin']).order_by('name')
     sectors = Commission.objects.distinct('sector')
     subprocesses = SubprocessValue.objects.order_by('name')
-
-    return render_template('reports.html',
-        total_attendances=len(filtered_commissions),
-        total_value=sum(c.value for c in filtered_commissions),
-        attendances_by_operator=dict(attendances_by_operator),
-        attendances_by_subprocess=dict(attendances_by_subprocess),
-        operators=operators, sectors=sectors, subprocesses=subprocesses,
-        filters={
-            'user_id': user_filter, 'sector': sector_filter, 'subprocess': subprocess_filter,
-            'start_date': start_date_filter, 'end_date': end_date_filter
-        }
-    )
+    return render_template('reports.html', total_attendances=len(filtered_commissions), total_value=sum(c.value for c in filtered_commissions), attendances_by_operator=dict(attendances_by_operator), attendances_by_subprocess=dict(attendances_by_subprocess), operators=operators, sectors=sectors, subprocesses=subprocesses, period_string=period_string, filters={'user_id': user_filter, 'sector': sector_filter, 'subprocess': subprocess_filter, 'start_date': start_date_filter, 'end_date': end_date_filter, 'current_period': current_period_filter})
 
 @app.route('/manage/users')
 @login_required
@@ -271,49 +284,116 @@ def delete_commission_bulk():
 @app.route('/user/add', methods=['POST'])
 @login_required
 def add_user():
-    # ... (código da rota add_user)
-    pass
+    if current_user.role not in ['admin', 'superadmin']: return redirect(url_for('index'))
+    name, email, password, role = request.form.get('name'), request.form.get('email'), request.form.get('password'), request.form.get('role')
+    if role == 'superadmin' and current_user.role != 'superadmin':
+        flash('Apenas Superadmins podem criar outros Superadmins.', 'danger')
+        return redirect(url_for('manage_users'))
+    try:
+        User(name=name, email=email, password_hash=generate_password_hash(password), role=role).save()
+        flash('Usuário criado com sucesso!', 'success')
+    except NotUniqueError:
+        flash('Erro: Nome ou e-mail já está em uso.', 'danger')
+    return redirect(url_for('manage_users'))
 
 @app.route('/user/edit/<id>', methods=['POST'])
 @login_required
 def edit_user(id):
-    # ... (código da rota edit_user)
-    pass
+    if current_user.role not in ['admin', 'superadmin']: return redirect(url_for('index'))
+    user_to_edit = User.objects.get(id=id)
+    if current_user.role == 'admin' and user_to_edit.role in ['admin', 'superadmin']:
+        flash('Admins não podem editar outros Admins ou Superadmins.', 'danger')
+        return redirect(url_for('manage_users'))
+    if current_user.role != 'superadmin' and user_to_edit.role == 'superadmin':
+        flash('Apenas outro superadmin pode editar um superadmin.', 'danger')
+        return redirect(url_for('manage_users'))
+    user_to_edit.name = request.form.get('name')
+    user_to_edit.email = request.form.get('email')
+    if current_user.role == 'superadmin':
+        user_to_edit.role = request.form.get('role')
+    try:
+        user_to_edit.save()
+        flash('Usuário atualizado com sucesso!', 'success')
+    except NotUniqueError:
+        flash('Erro: Nome ou e-mail já está em uso.', 'danger')
+    return redirect(url_for('manage_users'))
 
 @app.route('/user/delete/<id>', methods=['POST'])
 @login_required
 def delete_user(id):
-    # ... (código da rota delete_user)
-    pass
+    if current_user.role not in ['admin', 'superadmin']: return redirect(url_for('index'))
+    user_to_delete = User.objects.get(id=id)
+    if user_to_delete.id == current_user.id:
+        flash('Você não pode remover sua própria conta.', 'danger')
+    elif user_to_delete.role == 'superadmin' and current_user.role != 'superadmin':
+        flash('Apenas um Superadmin pode remover outro Superadmin.', 'danger')
+    elif user_to_delete.role == 'admin' and current_user.role != 'superadmin':
+        flash('Apenas um Superadmin pode remover um Admin.', 'danger')
+    else:
+        user_to_delete.delete()
+        flash('Usuário removido com sucesso!', 'success')
+    return redirect(url_for('manage_users'))
 
 @app.route('/user/change-password/<id>', methods=['POST'])
 @login_required
 def change_password(id):
-    # ... (código da rota change_password)
-    pass
+    if current_user.role not in ['admin', 'superadmin']: return redirect(url_for('index'))
+    user_to_update = User.objects.get(id=id)
+    if user_to_update.role == 'superadmin' and current_user.role != 'superadmin':
+        flash('Apenas um Superadmin pode alterar a senha de outro Superadmin.', 'danger')
+        return redirect(url_for('manage_users'))
+    if user_to_update.role == 'admin' and current_user.role != 'superadmin':
+        flash('Apenas um Superadmin pode alterar a senha de um Admin.', 'danger')
+        return redirect(url_for('manage_users'))
+    new_password = request.form.get('password')
+    if not new_password or len(new_password) < 4:
+        flash('A nova senha deve ter pelo menos 4 caracteres.', 'warning')
+    else:
+        user_to_update.password_hash = generate_password_hash(new_password)
+        user_to_update.save()
+        flash(f'Senha do usuário {user_to_update.name} foi alterada!', 'success')
+    return redirect(url_for('manage_users'))
 
 @app.route('/subprocess/add', methods=['POST'])
 @login_required
 def add_subprocess():
-    # ... (código da rota add_subprocess)
-    pass
+    if current_user.role not in ['admin', 'superadmin']: return redirect(url_for('index'))
+    name, value = request.form.get('name'), request.form.get('value')
+    if name and value:
+        try:
+            SubprocessValue(name=name.strip(), value=float(value)).save()
+            flash('Subprocesso adicionado com sucesso!', 'success')
+        except NotUniqueError:
+            flash('Já existe um subprocesso com este nome.', 'danger')
+    return redirect(url_for('manage_subprocesses'))
 
 @app.route('/subprocess/edit/<id>', methods=['POST'])
 @login_required
 def edit_subprocess(id):
-    # ... (código da rota edit_subprocess)
-    pass
+    if current_user.role not in ['admin', 'superadmin']: return redirect(url_for('index'))
+    try:
+        sp = SubprocessValue.objects.get(id=id)
+        sp.name, sp.value = request.form.get('name').strip(), float(request.form.get('value'))
+        sp.save()
+        flash('Subprocesso atualizado com sucesso!', 'success')
+    except NotUniqueError:
+        flash('Já existe outro subprocesso com este nome.', 'danger')
+    return redirect(url_for('manage_subprocesses'))
 
 @app.route('/subprocess/delete/<id>', methods=['POST'])
 @login_required
 def delete_subprocess(id):
-    # ... (código da rota delete_subprocess)
-    pass
+    if current_user.role not in ['admin', 'superadmin']: return redirect(url_for('index'))
+    SubprocessValue.objects.get(id=id).delete()
+    flash('Subprocesso removido com sucesso!', 'success')
+    return redirect(url_for('manage_subprocesses'))
     
 @app.route('/setup/create-first-superadmin')
 def create_first_superadmin():
-    # ... (código da rota de setup)
-    pass
+    if User.objects(role='superadmin').first(): return "Um Superadmin já existe.", 403
+    user = User(email='admin@telecom.com', name='Super Admin', password_hash=generate_password_hash('admin'), role='superadmin')
+    user.save()
+    return "Primeiro Superadmin criado com sucesso! Email: admin@telecom.com, Senha: admin"
 
 if __name__ == '__main__':
     app.run(debug=True)
