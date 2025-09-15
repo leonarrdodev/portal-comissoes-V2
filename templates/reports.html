@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-chart-line me-2"></i>Relatórios Gerais de Comissão</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header"><i class="fa-solid fa-filter me-2"></i>Filtros de Pesquisa</div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('reports') }}">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="user_id" class="form-label">Operador</label>
+                    <select name="user_id" id="user_id" class="form-select">
+                        <option value="">Todos</option>
+                        {% for op in operators %}<option value="{{ op.id }}" {% if filters.user_id == op.id|string %}selected{% endif %}>{{ op.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="sector" class="form-label">Setor</label>
+                    <select name="sector" id="sector" class="form-select">
+                        <option value="">Todos</option>
+                        {% for sec in sectors %}<option value="{{ sec }}" {% if filters.sector == sec %}selected{% endif %}>{{ sec }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="subprocess" class="form-label">Subprocesso</label>
+                    <select name="subprocess" id="subprocess" class="form-select">
+                        <option value="">Todos</option>
+                        {% for sp in subprocesses %}<option value="{{ sp.name }}" {% if filters.subprocess == sp.name %}selected{% endif %}>{{ sp.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Data Início</label>
+                    <input type="date" name="start_date" id="start_date" class="form-control" value="{{ filters.start_date or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">Data Fim</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control" value="{{ filters.end_date or '' }}">
+                </div>
+                <div class="col-md-6">
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass me-2"></i>Filtrar</button>
+                        <a href="{{ url_for('reports') }}" class="btn btn-secondary"><i class="fa-solid fa-eraser me-2"></i>Limpar</a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6"><div class="card text-bg-primary"><div class="card-body">
+        <h5 class="card-title"><i class="fa-solid fa-headset me-2"></i>Total de Atendimentos (Filtrados)</h5>
+        <p class="card-text fs-2 fw-bold">{{ total_attendances }}</p>
+    </div></div></div>
+    <div class="col-md-6"><div class="card text-bg-success"><div class="card-body">
+        <h5 class="card-title"><i class="fa-solid fa-dollar-sign me-2"></i>Valor Total de Comissões (Filtrado)</h5>
+        <p class="card-text fs-2 fw-bold">R$ {{ "%.2f"|format(total_value) }}</p>
+    </div></div></div>
+</div>
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="fa-solid fa-chart-pie me-2"></i>Atendimentos por Operador</div>
+            <div class="card-body" style="min-height: 300px;"><canvas id="operatorChart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="fa-solid fa-chart-bar me-2"></i>Atendimentos por Subprocesso</div>
+            <div class="card-body" style="min-height: 300px;"><canvas id="subprocessChart"></canvas></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const operatorData = {{ attendances_by_operator | tojson }};
+    const operatorCtx = document.getElementById('operatorChart');
+    if (Object.keys(operatorData).length > 0) {
+        new Chart(operatorCtx, {
+            type: 'doughnut',
+            data: { labels: Object.keys(operatorData), datasets: [{ data: Object.values(operatorData) }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#ccc' } } } }
+        });
+    }
+    const subprocessData = {{ attendances_by_subprocess | tojson }};
+    const subprocessCtx = document.getElementById('subprocessChart');
+    if (Object.keys(subprocessData).length > 0) {
+        new Chart(subprocessCtx, {
+            type: 'bar',
+            data: { labels: Object.keys(subprocessData), datasets: [{ label: 'Quantidade', data: Object.values(subprocessData), backgroundColor: 'rgba(75, 192, 192, 0.7)' }] },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#ccc' } }, x: { ticks: { color: '#ccc' } } } }
+        });
+    }
+</script>
+{% endblock %}

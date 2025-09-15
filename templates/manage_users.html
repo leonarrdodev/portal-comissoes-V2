@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-users-cog me-2"></i>Gerenciar Usuários</h1>
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createUserModal">
+        <i class="fa-solid fa-user-plus me-2"></i>Criar Novo Usuário
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="h5 mb-0">Lista de Usuários Cadastrados</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Email</th>
+                        <th>Função</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            {% if user.role == 'superadmin' %}
+                                <span class="badge bg-danger">{{ user.role }}</span>
+                            {% elif user.role == 'admin' %}
+                                <span class="badge bg-warning text-dark">{{ user.role }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ user.role }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {# Regra de Permissão: Define quem pode gerenciar quem #}
+                            {% set can_manage = (current_user.role == 'superadmin' and user.id != current_user.id) or (current_user.role == 'admin' and user.role == 'agent') %}
+                            
+                            {% if can_manage %}
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}"><i class="fa-solid fa-user-pen me-1"></i>Editar</button>
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#changePasswordModal{{ user.id }}"><i class="fa-solid fa-key me-1"></i>Senha</button>
+                                <form action="{{ url_for('delete_user', id=user.id) }}" method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja remover este usuário?')"><i class="fa-solid fa-user-times me-1"></i>Remover</button>
+                                </form>
+                            {% else %}
+                                <span class="text-muted fst-italic">Sem permissão</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createUserModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Criar Novo Usuário</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form action="{{ url_for('add_user') }}" method="post">
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label">Nome Completo</label><input type="text" class="form-control" name="name" required></div>
+            <div class="mb-3"><label class="form-label">E-mail</label><input type="email" class="form-control" name="email" required></div>
+            <div class="mb-3"><label class="form-label">Senha</label><input type="password" class="form-control" name="password" required></div>
+            <div class="mb-3"><label class="form-label">Função</label>
+                <select class="form-select" name="role">
+                    <option value="agent">Atendente</option>
+                    <option value="admin">Administrador</option>
+                    {# Regra: Apenas um Superadmin pode ver a opção de criar outro Superadmin #}
+                    {% if current_user.role == 'superadmin' %}
+                    <option value="superadmin">Superadmin</option>
+                    {% endif %}
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-success">Criar Usuário</button></div>
+    </form>
+</div></div></div>
+
+{% for user in users %}
+    <div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Usuário {{ user.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form action="{{ url_for('edit_user', id=user.id) }}" method="POST">
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Nome</label><input type="text" class="form-control" name="name" value="{{ user.name }}" required></div>
+                <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ user.email }}" required></div>
+                {% if current_user.role == 'superadmin' %}
+                <div class="mb-3"><label class="form-label">Função</label>
+                    <select class="form-select" name="role">
+                        <option value="agent" {% if user.role == 'agent' %}selected{% endif %}>Atendente</option>
+                        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrador</option>
+                        <option value="superadmin" {% if user.role == 'superadmin' %}selected{% endif %}>Superadmin</option>
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Salvar</button></div>
+        </form>
+    </div></div></div>
+
+    <div class="modal fade" id="changePasswordModal{{ user.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Alterar Senha de {{ user.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form action="{{ url_for('change_password', id=user.id) }}" method="POST">
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Nova Senha</label><input type="password" class="form-control" name="password" required minlength="4"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Salvar Nova Senha</button></div>
+        </form>
+    </div></div></div>
+{% endfor %}
+{% endblock %}

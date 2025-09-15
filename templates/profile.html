@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-user-circle me-2"></i>Meu Perfil</h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Alterar Minha Senha</h3>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('update_password') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Senha Atual</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" minlength="4" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="4" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save me-2"></i>Salvar Nova Senha</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Minhas Informações</h3>
+            </div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><strong>Nome:</strong> {{ current_user.name }}</li>
+                <li class="list-group-item"><strong>Email:</strong> {{ current_user.email }}</li>
+                <li class="list-group-item"><strong>Função:</strong> {{ current_user.role }}</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard do Administrador</h1>
+</div>
+<div class="row">
+    <div class="col-md-6 col-xl-3 mb-4">
+        <div class="card text-bg-primary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><h5 class="card-title">Usuários Totais</h5><p class="fs-2 fw-bold">{{ stats.total_users }}</p></div>
+                    <div class="fs-2 text-white-50"><i class="fa-solid fa-users"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3 mb-4">
+        <div class="card text-bg-info h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><h5 class="card-title">Subprocessos</h5><p class="fs-2 fw-bold">{{ stats.total_subprocesses }}</p></div>
+                    <div class="fs-2 text-white-50"><i class="fa-solid fa-cogs"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3 mb-4">
+        <div class="card text-bg-secondary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><h5 class="card-title">Atendimentos</h5><p class="fs-2 fw-bold">{{ stats.total_commissions }}</p></div>
+                    <div class="fs-2 text-white-50"><i class="fa-solid fa-headset"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3 mb-4">
+        <div class="card text-bg-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><h5 class="card-title">Comissão Total</h5><p class="fs-2 fw-bold">R$ {{ "%.2f"|format(stats.total_value) }}</p></div>
+                    <div class="fs-2 text-white-50"><i class="fa-solid fa-dollar-sign"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-xl-8 mb-4">
+        <div class="card">
+            <div class="card-header"><i class="fa-solid fa-chart-bar me-2"></i>Atendimentos na Última Semana</div>
+            <div class="card-body"><canvas id="weeklyChart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-xl-4 mb-4">
+        <div class="card">
+            <div class="card-header"><i class="fa-solid fa-bolt me-2"></i>Ações Rápidas</div>
+            <div class="list-group list-group-flush">
+                <a href="{{ url_for('upload_page') }}" class="list-group-item list-group-item-action"><i class="fa-solid fa-cloud-upload fa-fw me-2"></i>Carregar Dados</a>
+                <a href="{{ url_for('manage_users') }}" class="list-group-item list-group-item-action"><i class="fa-solid fa-users-cog fa-fw me-2"></i>Gerenciar Usuários</a>
+                <a href="{{ url_for('manage_subprocesses') }}" class="list-group-item list-group-item-action"><i class="fa-solid fa-cogs fa-fw me-2"></i>Gerenciar Subprocessos</a>
+                <a href="{{ url_for('manage_commissions') }}" class="list-group-item list-group-item-action"><i class="fa-solid fa-list-ul fa-fw me-2"></i>Ver Todos Atendimentos</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const weeklyCtx = document.getElementById('weeklyChart');
+    new Chart(weeklyCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [{
+                label: 'Atendimentos por Dia',
+                data: {{ chart_values | tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: { beginAtZero: true, ticks: { color: '#ccc' }},
+                x: { ticks: { color: '#ccc' }}
+            },
+            plugins: { legend: { display: false }}
+        }
+    });
+</script>
+{% endblock %}

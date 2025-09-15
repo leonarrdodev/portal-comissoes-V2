@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fa-solid fa-cloud-upload me-2"></i>Carregar Relatório de Atendimentos</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left me-2"></i>Voltar ao Dashboard
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Selecione o arquivo para importação</h5>
+                <p class="card-text">
+                    O sistema irá processar o arquivo, calcular as comissões com base nos subprocessos cadastrados e salvar os registros no banco de dados.
+                </p>
+                <hr>
+                <h6>Instruções:</h6>
+                <ul class="list-group list-group-flush mb-3">
+                    <li class="list-group-item bg-transparent">1. O arquivo deve ser no formato `.xlsx` ou `.csv`.</li>
+                    <li class="list-group-item bg-transparent">2. As colunas necessárias são: `Usuário`, `Assunto`, `Departamento`, `Cliente` e `Criado em`.</li>
+                    <li class="list-group-item bg-transparent">3. O nome na coluna `Usuário` deve ser **idêntico** ao cadastrado no sistema.</li>
+                    <li class="list-group-item bg-transparent">4. O nome na coluna `Assunto` deve ser **idêntico** a um Subprocesso cadastrado.</li>
+                    <li class="list-group-item bg-transparent">5. Registros duplicados (mesmo usuário, cliente, assunto e data/hora) serão ignorados.</li>
+                </ul>
+
+                <form action="{{ url_for('upload_process') }}" method="post" enctype="multipart/form-data">
+                    <div class="input-group">
+                        <input class="form-control" type="file" name="file" required accept=".xlsx, .csv">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane me-2"></i>Processar Arquivo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
